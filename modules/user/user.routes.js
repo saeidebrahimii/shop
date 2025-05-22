@@ -12,6 +12,7 @@ const {
   checkOtpMobileValidation,
   sendOtpMobileValidation,
 } = require("./user.validation");
+const { emptyRequest } = require("../middlewares/emptyRequest.middleware");
 
 const router = Router();
 
@@ -26,6 +27,11 @@ router.post(
   validate(checkOtpMobileValidation, {}, {}),
   checkOtpMobileHandler
 );
-router.post("/login", validate(loginValidation, {}, {}), loginUserHandler);
+router.post(
+  "/login",
+  emptyRequest,
+  validate(loginValidation, {}, {}),
+  loginUserHandler
+);
 
 module.exports = { userRoutes: router };

@@ -8,6 +8,7 @@ const {
 const jwt = require("jsonwebtoken");
 const { userMessages } = require("./user.message");
 const { globalMessages } = require("../../common/global.message");
+const { sendOtpPayamak, sendPayamak } = require("../service/melipayamak");
 
 async function createUserHandler(req, res, next) {
   const { first_name, last_name, mobile, email, password } = req.body;
@@ -33,9 +34,9 @@ async function createUserHandler(req, res, next) {
     const otpMobile = await sendOtpMobile(newUser?.id);
     if (!otpMobile)
       return res.status(500).json({ msg: userMessages.otpFailed });
+    const sendPayamak = await sendOtpPayamak(mobile, otpMobile);
     return res.status(201).json({
       message: userMessages.userCreated,
-      otpCode: otpMobile,
       statusCode: 201,
     });
   } catch (error) {
@@ -80,7 +81,8 @@ async function sendOtpMobileHandler(req, res, next) {
         .status(429)
         .json({ msg: userMessages.otpMobileNotExpireIn, statusCode: 429 });
     const code = await sendOtpMobile(user?.id);
-    return res.json({ msg: userMessages.sendOtp, code, statusCode: 200 });
+    const sendPayamak = await sendOtpPayamak(user?.mobile, code);
+    return res.json({ msg: userMessages.sendOtp, statusCode: 200 });
   } catch (error) {
     next(error);
   }
@@ -104,6 +106,12 @@ async function checkOtpMobileHandler(req, res, next) {
       date.setTime(date.getTime());
       user.mobile_verified_at = date.toUTCString();
       await user.save();
+      const payamak = sendPayamak(
+        user.mobile,
+        `${
+          user.first_name + " " + user.last_name + "," + " عزیز"
+        }\nموبایل شما با موفقیت ثبت شد.`
+      );
       return res.json({ msg: userMessages.successfullyVerifyMobile });
     }
     return res
@@ -115,7 +123,7 @@ async function checkOtpMobileHandler(req, res, next) {
 }
 
 async function loginUserHandler(req, res, next) {
-  const { mobile, password } = req.body;
+  const { mobile = undefined, password = undefined } = req.body;
   try {
     const user = await User.findOne({ where: { mobile } });
     if (!user) return res.status(404).json({ msg: userMessages.notFound });
@@ -125,9 +133,16 @@ async function loginUserHandler(req, res, next) {
       const { access_token, refresh_token } = await generateJwtToken({
         userId: user?.id,
       });
-      return res.json({ msg: userMessages.login, access_token, refresh_token });
+      return res.json({
+        msg: userMessages.login,
+        access_token,
+        refresh_token,
+      });
     }
-    return res.status(401).json({msg:userMessages.passwordOrMobileNotCorrect,statusCode:401})
+    return res.status(401).json({
+      msg: userMessages.passwordOrMobileNotCorrect,
+      statusCode: 401,
+    });
   } catch (error) {
     next(error);
   }
